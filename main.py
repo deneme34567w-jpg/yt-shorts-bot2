@@ -34,9 +34,9 @@ def foto_cek(page, isim):
     except Exception as e:
         print(f" [FOTO UYARI] {isim}: {e}")
 
-# ================= 1. GEMINI PROMPT VE METADATA =================
+# ================= 1. GEMINI 3.6 FLASH PROMPT VE METADATA =================
 def icerik_uret():
-    print("\n[1/3] Gemini bugünün benzersiz minyatür menüsünü ve promptunu hazırlıyor...")
+    print("\n[1/3] Gemini 3.6 Flash günün menüsünü ve promptunu hazırlıyor...")
     sistem_talimati = """Sen Kling AI için sinematik ASMR minyatür mutfak video yönetmenisin.
 Bugün için dünya mutfaklarından özgün, viral olabilecek 10 saniyelik 9:16 dikey bir yemek videosu promptu ve YouTube SEO verisi yaz.
 
@@ -58,7 +58,7 @@ Bugün için dünya mutfaklarından özgün, viral olabilecek 10 saniyelik 9:16 
 }"""
 
     response = client.models.generate_content(
-        model='gemini-2.5-flash',
+        model='gemini-3.6-flash',
         contents=sistem_talimati
     )
     clean_json = response.text.replace("```json", "").replace("```", "").strip()
@@ -67,16 +67,16 @@ Bugün için dünya mutfaklarından özgün, viral olabilecek 10 saniyelik 9:16 
     print(f" Başlık: {veri.get('title')}")
     return veri
 
-# ================= 2. GERİ BESLEMELİ SAPMA DÜZELTİCİ GEMINI VİSİON AJANI =================
+# ================= 2. GERİ BESMELİ SAPMA DÜZELTİCİ GEMINI 3.6 FLASH AJANI =================
 def gemini_otonom_karar_al(ekran_yolu, video_prompt, adim_no, onceki_karar, onceki_sonuc):
-    print(f"\n -> [GEMINI GÖZÜ] Ekran inceleniyor (Adım {adim_no})...")
+    print(f"\n -> [GEMINI 3.6 GÖZÜ] Ekran inceleniyor (Adım {adim_no})...")
     img = Image.open(ekran_yolu)
     
     ajan_talimati = f"""Sen tarayıcıyı yöneten otonom ve kendini düzelten bir AI Ajanısın (Self-Correcting GUI Agent).
 Şu anda ekrandaki görüntüye bakıyorsun (Çözünürlük: 1920x1080).
 
 HEDEF SIRASI:
-1. Eğer ekranda 'Sign In' / 'Log In' butonu varsa tıkla.
+1. Eğer ekranda 'Sign In' / 'Log In' / '登录' / '立即体验' butonu varsa tıkla.
 2. Açılan formda e-posta kutusuna '{KLING_EMAIL}' ve şifre kutusuna '{KLING_PASSWORD}' yazıp giriş yap.
 3. 'AI Video' / 'Text to Video' bölümüne git.
 4. '9:16' dikey formatını seç.
@@ -103,7 +103,7 @@ BANA SADECE AŞAĞIDAKİ JSON FORMATINDA CEVAP VER:
 }}"""
 
     response = client.models.generate_content(
-        model='gemini-2.5-flash',
+        model='gemini-3.6-flash',
         contents=[ajan_talimati, img]
     )
     clean_json = response.text.replace("```json", "").replace("```", "").strip()
@@ -158,7 +158,7 @@ def otonom_kling_video_uret(video_prompt):
         page.goto("https://klingai.com", wait_until="domcontentloaded", timeout=45000)
         page.wait_for_timeout(5000)
 
-        # OTONOM GÖRSEL DÖNGÜ (Gemini her adımda inceler, sapmayı çözer)
+        # OTONOM GÖRSEL DÖNGÜ (Gemini 3.6 Flash yönetir)
         video_tamamlandi = False
         onceki_karar = {}
         onceki_sonuc = ""
@@ -175,11 +175,11 @@ def otonom_kling_video_uret(video_prompt):
                 print(" Video ağ akışından başarıyla yakalandı ve kaydedildi!")
                 break
 
-            # Gemini Vision karar motoruna gönder
+            # Gemini 3.6 Flash Vision karar motoruna gönder
             try:
                 karar = gemini_otonom_karar_al(ekran_foto, video_prompt, adim, onceki_karar, onceki_sonuc)
             except Exception as e:
-                print(f"Gemini Vision API gecikmesi: {e}")
+                print(f"Gemini 3.6 Flash analiz uyarısı: {e}")
                 time.sleep(3)
                 continue
 
