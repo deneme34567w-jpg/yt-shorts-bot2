@@ -13,109 +13,94 @@ from googleapiclient.http import MediaFileUpload
 
 os.makedirs("ekran_goruntuleri", exist_ok=True)
 
+if "FLOW_STATE_BASE64" in os.environ:
+    with open("flow_state.json", "wb") as f:
+        f.write(base64.b64decode(os.environ["FLOW_STATE_BASE64"]))
+
 if "YOUTUBE_TOKEN_JSON" in os.environ:
     with open("youtube_token.json", "w", encoding="utf-8") as f:
         f.write(os.environ["YOUTUBE_TOKEN_JSON"])
 
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
-KLING_EMAIL = os.environ.get("KLING_EMAIL", "")
-KLING_PASSWORD = os.environ.get("KLING_PASSWORD", "")
+if not GEMINI_KEY:
+    raise Exception("GEMINI_API_KEY bulunamadı!")
 
-def foto_cek(page, isim):
-    dosya_yolu = f"ekran_goruntuleri/{isim}"
-    try:
-        page.screenshot(path=dosya_yolu, timeout=8000)
-        print(f" [FOTO] {isim} kaydedildi.")
-    except Exception as e:
-        print(f" [FOTO UYARI] {isim}: {e}")
+client = genai.Client(api_key=GEMINI_KEY)
 
-# ================= 1. GEMINI PROMPT =================
-def gemini_ile_kling_icerik_uret():
-    print("\n[1/4] Gemini Kling AI için günlük ASMR promptu hazırlıyor...")
-    bugun_tarih = datetime.now().strftime("%Y-%m-%d")
-    
-    sistem_talimati = f"""Sen Kling AI için sinematik ASMR video prompt uzmanısın.
-Tarih: {bugun_tarih}.
-
-GÖREV:
-1. Dünya mutfaklarından viral olabilecek özgün minyatür bir yemek seç.
-2. Kling AI'ın kamera hareketlerini, ışıklandırmasını ve doku fiziğini içeren 60-80 kelimelik İngilizce video promptu ve YouTube SEO başlığı yaz.
+# ================= 1. GEMINI 3.6 FLASH: PROMPT VE SEO ÜRETİCİ =================
+def icerik_uret():
+    print("\n[1/3] Gemini 3.6 Flash günün menüsünü ve promptunu hazırlıyor...")
+    sistem_talimati = """Sen dünyanın en iyi ASMR minyatür mutfak video yönetmenisin.
+Bugün için dünya mutfaklarından özgün, viral olabilecek 10 saniyelik 9:16 dikey bir yemek videosu promptu ve YouTube SEO verisi yaz.
 
 İmza Tarzı:
-- "Ultra realistic 8k macro video of miniature cooking in a tiny kitchen on a warm wooden countertop..." ile başla.
-- Ahşap tezgahta minyatür mutfak, tealight alevli taş ocak, bakır tava.
+- Sıcak ahşap tezgahta minyatür mutfak, tealight alevli taş ocak ve bakır tava.
 - Gerçek insan eli cam pipetle yağ damlatır.
 - Minik kaşıkla yemek konur, cızırtı/buhar başlar. Malzemeler eklenir.
 - Minik spatula ile çevrilir, mini seramik tabağa servis edilir.
 - Makro lens, altın saat ışığı, ASMR sesleri, 8K fotogerçekçi.
 
 ÇIKTI FORMATI (SADECE JSON):
-{{
-  "food_name": "Yemeğin İngilizce Adı",
-  "prompt": "Ultra realistic 8k macro video of miniature cooking in a tiny kitchen...",
+{
+  "food_name": "Yemeğin Adı",
+  "prompt": "In a 9:16 vertical miniature kitchen on a warm wooden countertop...",
   "title": "Satisfying Tiny [Food Name] Cooking ASMR + Emoji + #Shorts",
-  "description": "Miniature kitchen ASMR cooking experience: [Food Name]. 8K ultra realistic. #MiniatureCooking #ASMR #Shorts #Satisfying #KlingAI",
-  "tags": ["miniature cooking", "mini food", "asmr cooking", "satisfying", "shorts", "kling ai"]
+  "description": "Miniature kitchen ASMR cooking experience. 8K ultra realistic. #MiniatureCooking #ASMR #Shorts #Satisfying",
+  "tags": ["miniature cooking", "mini food", "asmr cooking", "satisfying", "shorts"]
+}"""
+
+    response = client.models.generate_content(
+        model='gemini-3.6-flash',
+        contents=sistem_talimati
+    )
+    clean_json = response.text.replace("```json", "").replace("```", "").strip()
+    veri = json.loads(clean_json)
+    print(f" Menü: {veri.get('food_name')}")
+    print(f" Başlık: {veri.get('title')}")
+    return veri
+
+# ================= 2. GEMINI 3.6 FLASH GÖRSEL AJAN KARAR MOTORU =================
+def gemini_karar_ver(ekran_yolu, video_prompt, adim_sayisi):
+    print(f" -> [AJAN GÖZÜ] Gemini 3.6 Flash ekrana bakıyor (Adım {adim_sayisi})...")
+    img = Image.open(ekran_yolu)
+    
+    ajan_talimati = f"""Sen tarayıcıyı yöneten otonom bir AI Ajanısın (Autonomous GUI Agent).
+Şu anki ekran görüntüsünü dikkatle incele. 1920x1080 çözünürlükte çalışıyoruz.
+
+HEDEFİMİZ:
+1. Eğer ekranda giriş/hesap seçme penceresi varsa hesaba tıkla veya giriş yap.
+2. Eğer ana sayfadaysan son projeyi veya yeni projeyi aç.
+3. Proje içindeysen Video, 9:16, Omni Flash ve 10s ayarlarını yap.
+4. Prompt kutusunu bul ve şu metni yaz: "{video_prompt}"
+5. Beyaz gönderme okuna tıkla ve videonun üretilmesini bekle.
+6. Video üretildiğinde (oynatıcı veya indirme butonu belirdiğinde) indir ve işlemi tamamla.
+
+BANA SADECE AŞAĞIDAKİ JSON FORMATINDA CEVAP VER:
+{{
+  "durum_analizi": "Ekranda ne gördüğünün 1 cümlelik özeti",
+  "eylem": "click" | "type" | "press" | "wait" | "done",
+  "x": 0-1920 arası X koordinatı,
+  "y": 0-1080 arası Y koordinatı,
+  "yazilacak_metin": "Eğer eylem type ise yazılacak metin",
+  "basilacak_tus": "Enter" | "Control+Enter" | "Escape",
+  "bekleme_saniyesi": 3
 }}"""
 
-    if GEMINI_KEY:
-        try:
-            client = genai.Client(api_key=GEMINI_KEY)
-            response = client.models.generate_content(
-                model='gemini-3.6-flash',
-                contents=sistem_talimati
-            )
-            clean_json = response.text.replace("```json", "").replace("```", "").strip()
-            veri = json.loads(clean_json)
-            print(f" Günün Menüsü: {veri.get('food_name', 'Minyatür Lezzet')}")
-            print(f" YouTube Başlığı: {veri['title']}")
-            return veri
-        except Exception as e:
-            print(f"Gemini API uyarısı ({e}), varsayılan şablon devrede...")
+    response = client.models.generate_content(
+        model='gemini-3.6-flash',
+        contents=[ajan_talimati, img]
+    )
+    clean_json = response.text.replace("```json", "").replace("```", "").strip()
+    karar = json.loads(clean_json)
+    print(f"    Görsel Analiz: {karar.get('durum_analizi')}")
+    print(f"    Alınan Karar: {karar.get('eylem')} (X: {karar.get('x')}, Y: {karar.get('y')})")
+    return karar
 
-    return {
-        "food_name": "Mini Souffle Pancake",
-        "prompt": "Ultra realistic 8k macro video, 9:16 vertical shorts. Inside a cozy miniature kitchen, a stone stove glows with a tealight flame under a mini copper pan. Real human hand drops oil with glass pipette. Delicate fluffy pancake batter sizzles gently with realistic steam, flipped with mini spatula onto a ceramic dish with maple syrup. Macro lens, golden hour light, 8K photorealistic.",
-        "title": "Satisfying Mini Souffle Pancake Cooking ASMR 🥞 #Shorts",
-        "description": "Miniature kitchen ASMR cooking experience. 8K ultra realistic. #MiniatureCooking #ASMR #Shorts #Satisfying",
-        "tags": ["miniature cooking", "mini food", "asmr cooking", "satisfying", "shorts"]
-    }
-
-# ================= 2. OTOMATİK GİRİŞ YAPICI =================
-def otomatik_giris_yap(page):
-    print(" Oturum kontrolü yapılıyor...")
-    page.wait_for_timeout(3000)
-    
-    # Eğer giriş butonu varsa
-    sign_in_btn = page.locator("button:has-text('Sign In'), button:has-text('Log In'), button:has-text('Giriş'), [class*='signin'], [class*='login']").first
-    if sign_in_btn.is_visible(timeout=3000):
-        print(" -> Oturum kapalı! E-posta ve şifre ile otomatik giriş yapılıyor...")
-        sign_in_btn.click(force=True)
-        page.wait_for_timeout(2000)
-
-        # E-posta yaz
-        email_box = page.locator("input[type='email'], input[placeholder*='email' i], input[name*='email' i]").first
-        if email_box.is_visible(timeout=3000):
-            email_box.fill(KLING_EMAIL)
-            page.wait_for_timeout(500)
-
-        # Şifre yaz
-        pass_box = page.locator("input[type='password'], input[placeholder*='password' i], input[name*='password' i]").first
-        if pass_box.is_visible(timeout=3000):
-            pass_box.fill(KLING_PASSWORD)
-            page.wait_for_timeout(500)
-
-        # Giriş Yap butonuna bas
-        submit_btn = page.locator("button[type='submit'], button:has-text('Log In'), button:has-text('Sign In')").last
-        submit_btn.click(force=True)
-        print(" -> Giriş bilgileri gönderildi!")
-        page.wait_for_timeout(6000)
-
-# ================= 3. KLING AI MOTORU =================
-def kling_ile_video_uret(video_prompt):
-    print("\n[2/4] Kling AI başlatılıyor (Otomatik Giriş & 66 Kredi Modu)...")
-    yakalanan_video_bytes = []
+# ================= 3. OTONOM VİDEO ÜRETİM DÖNGÜSÜ =================
+def otonom_video_uret(video_prompt):
+    print("\n[2/3] Otonom Vision Agent döngüsü başlatılıyor...")
     dosya_yolu = os.path.abspath("shorts_video.mp4")
+    yakalanan_video_bytes = []
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -130,6 +115,7 @@ def kling_ile_video_uret(video_prompt):
         )
         
         context = browser.new_context(
+            storage_state="flow_state.json" if os.path.exists("flow_state.json") else None,
             viewport={"width": 1920, "height": 1080},
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         )
@@ -137,109 +123,97 @@ def kling_ile_video_uret(video_prompt):
         page = context.new_page()
         page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-        # Ağ üzerinden MP4 yakalama
+        # Ağ dinleyicisi
         def network_video_yakala(response):
             try:
                 content_type = response.headers.get("content-type", "")
                 url = response.url.lower()
-                if ("video" in content_type or ".mp4" in url or "kling" in url) and response.status == 200:
+                if ("video" in content_type or ".mp4" in url or "googlevideo" in url or "videoplayback" in url) and response.status == 200:
                     data = response.body()
                     if len(data) > 300000:
                         yakalanan_video_bytes.append(data)
-                        print(f" [AĞ] Video yakalandı! Boyut: {len(data)/(1024*1024):.2f} MB")
+                        print(f" [AĞ] MP4 video akışı yakalandı! ({len(data)/(1024*1024):.2f} MB)")
             except:
                 pass
 
         page.on("response", network_video_yakala)
-        
-        print(" Kling AI açılıyor...")
-        page.goto("https://klingai.com/text-to-video/new", wait_until="domcontentloaded", timeout=45000)
-        page.wait_for_timeout(4000)
 
-        # 1. Otomatik Giriş Kontrolü
-        otomatik_giris_yap(page)
+        print(" Google Flow'a bağlanılıyor...")
+        page.goto("https://labs.google/flow", wait_until="domcontentloaded", timeout=45000)
+        page.wait_for_timeout(5000)
 
-        foto_cek(page, "01_kling_acildi.png")
-
-        # Pop-up'ları kapat
-        for btn_text in ["Confirm", "Accept", "Close", "Got it", "Dismiss", "OK", "Anladım"]:
-            try:
-                page.locator(f"button:has-text('{btn_text}'), [aria-label*='close']").first.click(timeout=1000)
-            except:
-                pass
-
-        # 2. 9:16 Formatını Seç
-        try:
-            oran_9_16 = page.locator("div:has-text('9:16'), button:has-text('9:16'), [data-value='9:16']").first
-            if oran_9_16.is_visible(timeout=2000):
-                oran_9_16.click(force=True)
-                page.wait_for_timeout(400)
-                print(" -> 9:16 Dikey Format seçildi.")
-        except Exception as e:
-            print(f"Format seçimi uyarısı: {e}")
-
-        # 3. Promptu Yaz
-        print("[3/4] Prompt giriliyor...")
-        prompt_box = page.locator("textarea, div[contenteditable='true'], [placeholder*='describe' i], [placeholder*='Prompt' i]").first
-        prompt_box.click(force=True)
-        page.wait_for_timeout(300)
-        page.keyboard.press("Control+A")
-        page.keyboard.press("Backspace")
-        page.wait_for_timeout(200)
-        page.keyboard.insert_text(video_prompt)
-        page.wait_for_timeout(1000)
-        foto_cek(page, "02_prompt_yazildi.png")
-
-        # 4. Generate Butonuna Tıkla
-        print(" Generate butonuna basılıyor...")
-        generate_btn = page.locator("button:has-text('Generate'), button:has-text('Oluştur'), button[class*='generate']").last
-        generate_btn.click(force=True)
-        page.wait_for_timeout(4000)
-        foto_cek(page, "03_uretim_basladi.png")
-
-        # 5. Render ve İndirme Döngüsü (Maksimum 6 dakika)
-        print(" Kling AI video render ediliyor (bekleniyor)...")
-        baslangic = time.time()
-        video_indirildi = False
-
-        while time.time() - baslangic < 360:
+        # OTONOM GÖRSEL KARAR DÖNGÜSÜ (Maksimum 20 Adım)
+        video_tamamlandi = False
+        for adim in range(1, 21):
+            ekran_foto = f"ekran_goruntuleri/adim_{adim:02d}.png"
+            page.screenshot(path=ekran_foto, timeout=8000)
+            
+            # Ağdan video zaten yakalandıysa bitir
             if len(yakalanan_video_bytes) > 0:
                 with open(dosya_yolu, "wb") as f:
                     f.write(yakalanan_video_bytes[-1])
+                video_tamamlandi = True
                 print(" Video ağ akışından başarıyla kaydedildi!")
-                video_indirildi = True
                 break
 
+            # Gemini 3.6 Flash'a ekranı göster ve karar aldır
             try:
-                download_btn = page.locator("button[aria-label*='Download'], button:has-text('Download'), a[download], [data-testid*='download']").first
-                if download_btn.is_visible(timeout=1000):
-                    with page.expect_download(timeout=15000) as download_info:
-                        download_btn.click(force=True)
-                    download = download_info.value
-                    download.save_as(dosya_yolu)
-                    video_indirildi = True
-                    print(" Video indirme butonundan başarıyla kaydedildi!")
-                    break
-            except:
-                pass
+                karar = gemini_karar_ver(ekran_foto, video_prompt, adim)
+            except Exception as e:
+                print(f"Gemini analiz hatası: {e}")
+                time.sleep(4)
+                continue
 
-            time.sleep(10)
-            gecen = int(time.time() - baslangic)
-            if gecen % 30 == 0:
-                print(f" Video işleniyor... ({gecen}. saniye)")
+            eylem = karar.get("eylem")
+            x = karar.get("x", 960)
+            y = karar.get("y", 540)
 
-        foto_cek(page, "04_son_durum.png")
+            # Gemini'nin kararını uygula
+            if eylem == "click":
+                page.mouse.click(x, y)
+                page.wait_for_timeout(karar.get("bekleme_saniyesi", 2) * 1000)
+            
+            elif eylem == "type":
+                page.mouse.click(x, y)
+                page.wait_for_timeout(300)
+                page.keyboard.press("Control+A")
+                page.keyboard.press("Backspace")
+                metin = karar.get("yazilacak_metin", video_prompt)
+                page.keyboard.insert_text(metin)
+                page.wait_for_timeout(karar.get("bekleme_saniyesi", 2) * 1000)
 
-        if not video_indirildi:
-            raise Exception("Kling AI videosu üretildi ancak indirilemedi.")
+            elif eylem == "press":
+                tus = karar.get("basilacak_tus", "Enter")
+                page.keyboard.press(tus)
+                page.wait_for_timeout(karar.get("bekleme_saniyesi", 2) * 1000)
+
+            elif eylem == "wait":
+                bekle = karar.get("bekleme_saniyesi", 10)
+                print(f" -> Gemini beklemeyi tercih etti ({bekle} saniye)...")
+                time.sleep(bekle)
+
+            elif eylem == "done":
+                print(" -> Gemini görevin bittiğini bildirdi!")
+                video_tamamlandi = True
+                break
+
+        page.screenshot(path="ekran_goruntuleri/son_durum.png", timeout=8000)
+
+        if not video_tamamlandi and len(yakalanan_video_bytes) > 0:
+            with open(dosya_yolu, "wb") as f:
+                f.write(yakalanan_video_bytes[-1])
+            video_tamamlandi = True
+
+        if not video_tamamlandi:
+            raise Exception("Otonom ajan videoyu tamamlayamadı.")
 
         browser.close()
-        print(f" 10s Video Başarıyla Hazırlandı: {dosya_yolu}")
+        print(f" 10s Video Hazır: {dosya_yolu}")
         return dosya_yolu
 
 # ================= 4. YOUTUBE OTOMATİK YÜKLEME =================
 def youtube_yukle(dosya_yolu, meta_veri):
-    print("\n[4/4] YouTube Shorts yüklemesi başlatılıyor...")
+    print("\n[3/3] YouTube Shorts yüklemesi başlatılıyor...")
     if not os.path.exists("youtube_token.json"):
         raise Exception("youtube_token.json bulunamadı!")
 
@@ -274,8 +248,8 @@ def youtube_yukle(dosya_yolu, meta_veri):
 # ================= ANA ÇALIŞTIRICI =================
 if __name__ == "__main__":
     try:
-        icerik_paketi = gemini_ile_kling_icerik_uret()
-        video_dosyasi = kling_ile_video_uret(icerik_paketi["prompt"])
+        icerik_paketi = icerik_uret()
+        video_dosyasi = otonom_video_uret(icerik_paketi["prompt"])
         youtube_yukle(video_dosyasi, icerik_paketi)
     except Exception as e:
         print(f"\n HATA OLUŞTU: {str(e)}")
