@@ -89,29 +89,13 @@ GÖREV:
         "tags": ["miniature cooking", "mini food", "asmr cooking", "satisfying", "shorts"]
     }
 
-# ================= 2. KLING VİTRİN GEÇİŞİ VE GİRİŞ =================
-def vitrin_gec_ve_giris_yap(page):
-    print(" Vitrin sayfası ve stüdyo geçişi kontrol ediliyor...")
-    page.wait_for_timeout(3000)
-
-    # 1. Ortadaki 'Create Now' veya 'Experience Now' Butonuna Bas
-    try:
-        create_now_btn = page.locator("button:has-text('Create Now'), a:has-text('Create Now'), button:has-text('Experience Now'), a:has-text('Experience Now'), a:has-text('Creative Studio')").first
-        if create_now_btn.is_visible(timeout=3000):
-            print(" -> 'Create Now' butonuna tıklandı, stüdyoya giriliyor...")
-            create_now_btn.click(force=True)
-            page.wait_for_timeout(5000)
-        elif page.locator("text='All-New KlingAI'").first.is_visible(timeout=1000):
-            page.mouse.click(960, 580)
-            page.wait_for_timeout(5000)
-    except Exception as e:
-        print(f"Vitrin geçişi uyarısı: {e}")
-
-    # 2. Oturum Kapalıysa E-posta / Şifre ile Giriş Yap
+# ================= 2. GİRİŞ KONTROLÜ =================
+def oturum_ac(page):
+    print(" Oturum kontrol ediliyor...")
     try:
         sign_in_btn = page.locator("button:has-text('Sign In'), button:has-text('Log In'), button:has-text('Giriş'), [class*='signin'], [class*='login']").first
         if sign_in_btn.is_visible(timeout=3000):
-            print(" -> Oturum açma formu dolduruluyor...")
+            print(" -> Giriş yapılıyor...")
             sign_in_btn.click(force=True)
             page.wait_for_timeout(2000)
             
@@ -126,7 +110,7 @@ def vitrin_gec_ve_giris_yap(page):
             page.locator("button[type='submit'], button:has-text('Log In'), button:has-text('Sign In')").last.click(force=True)
             page.wait_for_timeout(6000)
     except Exception as e:
-        print(f"Giriş kontrolü: {e}")
+        print(f"Giriş kontrolü uyarısı: {e}")
 
 # ================= 3. KLING AI MOTORU =================
 def otonom_kling_video_uret(video_prompt):
@@ -168,13 +152,27 @@ def otonom_kling_video_uret(video_prompt):
 
         page.on("response", network_video_yakala)
 
-        print(" Kling AI açılıyor...")
-        page.goto("https://klingai.com", wait_until="domcontentloaded", timeout=45000)
+        # Doğrudan stüdyo URL'sine git
+        print(" Kling AI Video Stüdyosu doğrudan açılıyor...")
+        page.goto("https://klingai.com/creation/video/text-to-video", wait_until="domcontentloaded", timeout=45000)
         page.wait_for_timeout(4000)
 
-        # 1. Vitrin Sayfasını Geç ve Giriş Yap
-        vitrin_gec_ve_giris_yap(page)
+        # Eğer vitrin sayfasına yönlendiyse 'Create Now' butonuna bas ve yeni sekmeyi yakala
+        if page.locator("text='All-New KlingAI'").first.is_visible(timeout=2000):
+            print(" -> Vitrin sayfası algılandı, yeni sekmeye geçiliyor...")
+            with context.expect_page() as new_page_info:
+                create_btn = page.locator("button:has-text('Create Now'), a:has-text('Create Now'), button:has-text('Experience Now')").first
+                if create_btn.is_visible(timeout=2000):
+                    create_btn.click(force=True)
+                else:
+                    page.mouse.click(960, 580)
+            
+            page = new_page_info.value
+            page.wait_for_load_state("domcontentloaded")
+            page.wait_for_timeout(4000)
 
+        # Oturum kontrolü
+        oturum_ac(page)
         foto_cek(page, "01_studio_acildi.png")
 
         # Pop-up'ları temizle
@@ -184,7 +182,7 @@ def otonom_kling_video_uret(video_prompt):
             except:
                 pass
 
-        # 2. 9:16 Formatını Seç
+        # 1. 9:16 Formatını Seç
         try:
             oran_btn = page.locator("div:has-text('9:16'), button:has-text('9:16'), [data-value='9:16']").first
             if oran_btn.is_visible(timeout=3000):
@@ -194,7 +192,7 @@ def otonom_kling_video_uret(video_prompt):
         except:
             pass
 
-        # 3. Prompt Kutusunu Bul ve Yaz
+        # 2. Prompt Kutusunu Bul ve Yaz
         print("[3/4] Prompt kutusu aranıyor ve yazılıyor...")
         prompt_box = page.locator("textarea, div[contenteditable='true'], [placeholder*='describe' i], [placeholder*='Prompt' i], [class*='prompt-input']").first
         prompt_box.wait_for(state="visible", timeout=35000)
@@ -208,14 +206,14 @@ def otonom_kling_video_uret(video_prompt):
         page.wait_for_timeout(1000)
         foto_cek(page, "02_prompt_girildi.png")
 
-        # 4. Generate Butonuna Bas
+        # 3. Generate Butonuna Bas
         print(" Generate butonuna basılıyor...")
         generate_btn = page.locator("button:has-text('Generate'), button:has-text('Oluştur'), button[class*='generate']").last
         generate_btn.click(force=True)
         page.wait_for_timeout(4000)
         foto_cek(page, "03_uretim_basladi.png")
 
-        # 5. Bekleme ve İndirme
+        # 4. Render ve İndirme
         print(" Video render ediliyor (bekleniyor)...")
         baslangic = time.time()
         video_indirildi = False
@@ -236,7 +234,7 @@ def otonom_kling_video_uret(video_prompt):
                     download = download_info.value
                     download.save_as(dosya_yolu)
                     video_indirildi = True
-                    print(" Video indirme butonundan kaydedildi!")
+                    print(" Video indirme butonundan başarıyla kaydedildi!")
                     break
             except:
                 pass
@@ -269,7 +267,7 @@ def youtube_yukle(dosya_yolu, meta_veri):
             "title": meta_veri["title"],
             "description": meta_veri["description"],
             "tags": meta_veri["tags"],
-            "categoryId": "26"
+            "categoryId": "26"  # Howto & Style
         },
         "status": {
             "privacyStatus": "public",
