@@ -34,9 +34,9 @@ def foto_cek(page, isim):
     except Exception as e:
         print(f" [FOTO UYARI] {isim}: {e}")
 
-# ================= GEMINI PROMPT VE METADATA ÜRETİCİ =================
+# ================= 1. GEMINI 3.6 FLASH PROMPT MÜHENDİSİ =================
 def icerik_uret():
-    print("\n[1/3] Gemini günün menüsünü ve sinematik promptunu hazırlıyor...")
+    print("\n[1/3] Gemini 3.6 Flash günün menüsünü ve sinematik promptunu hazırlıyor...")
     bugun_tarih = datetime.now().strftime("%Y-%m-%d")
     sistem_talimati = f"""Sen Kling AI için sinematik ASMR minyatür mutfak video yönetmenisin.
 Tarih: {bugun_tarih}.
@@ -55,16 +55,16 @@ GÖREV:
 ÇIKTI FORMATI (SADECE JSON):
 {{
   "food_name": "Yemeğin Adı",
-  "prompt": "Ultra realistic 8k macro video of miniature cooking in a tiny kitchen on a warm wooden countertop...",
+  "prompt": "Ultra realistic 8k macro video of miniature cooking in a tiny kitchen...",
   "title": "Satisfying Tiny [Food Name] Cooking ASMR + Emoji + #Shorts",
   "description": "Miniature kitchen ASMR cooking experience: [Food Name]. 8K ultra realistic. #MiniatureCooking #ASMR #Shorts #Satisfying #KlingAI",
   "tags": ["miniature cooking", "mini food", "asmr cooking", "satisfying", "shorts", "kling ai"]
 }}"""
 
-    for mod in ['gemini-2.5-flash', 'gemini-1.5-flash']:
+    for deneme in range(3):
         try:
             response = client.models.generate_content(
-                model=mod,
+                model='gemini-3.6-flash',
                 contents=sistem_talimati
             )
             clean_json = response.text.replace("```json", "").replace("```", "").strip()
@@ -73,8 +73,8 @@ GÖREV:
             print(f" Başlık: {veri['title']}")
             return veri
         except Exception as e:
-            print(f" [Gemini {mod} Uyarısı]: {e}")
-            time.sleep(2)
+            print(f" [Gemini 3.6 Flash {deneme+1}. Deneme]: {e}")
+            time.sleep(3)
 
     yedekler = [
         ("Miniature Wagyu Smash Burger", "Ultra realistic 8k macro video of miniature cooking in a tiny kitchen on a warm wooden countertop. A real human hand drops oil with a glass pipette onto a sizzling copper pan. A tiny spatula presses a miniature gourmet wagyu beef patty, melting cheddar cheese, served on a tiny toasted brioche bun. Golden hour lighting, crisp ASMR sounds, 8K ultra-realistic."),
@@ -90,9 +90,9 @@ GÖREV:
         "tags": ["miniature cooking", "mini food", "asmr cooking", "satisfying", "shorts"]
     }
 
-# ================= KLING AI VİDEO ÜRETİM MOTORU =================
+# ================= 2. KLING GLOBAL VİDEO MOTORU =================
 def otonom_kling_video_uret(video_prompt):
-    print("\n[2/3] Kling AI başlatılıyor (Doğrudan Stüdyo Modu)...")
+    print("\n[2/3] Kling Global (kling.ai) başlatılıyor...")
     dosya_yolu = os.path.abspath("shorts_video.mp4")
     yakalanan_video_bytes = []
 
@@ -130,26 +130,27 @@ def otonom_kling_video_uret(video_prompt):
 
         page.on("response", network_video_yakala)
 
-        # Doğrudan video oluşturucu sayfasına git
         print(" Kling AI Video Stüdyosu açılıyor...")
-        page.goto("https://klingai.com/text-to-video/new", wait_until="domcontentloaded", timeout=45000)
-        page.wait_for_timeout(5000)
+        page.goto("https://kling.ai/text-to-video", wait_until="domcontentloaded", timeout=45000)
+        page.wait_for_timeout(6000)
 
-        # 1. Oturum Kapalıysa Giriş Yap
+        # 1. Oturum Kapalıysa E-posta / Şifre ile Giriş Yap
         try:
             sign_in_btn = page.locator("button:has-text('Sign In'), button:has-text('Log In'), button:has-text('Giriş'), [class*='signin'], [class*='login']").first
             if sign_in_btn.is_visible(timeout=3000):
-                print(" -> Giriş formu dolduruluyor...")
+                print(" -> Oturum açılıyor...")
                 sign_in_btn.click(force=True)
                 page.wait_for_timeout(2000)
                 
                 email_box = page.locator("input[type='email'], input[placeholder*='email' i], input[name*='email' i]").first
-                if email_box.is_visible(timeout=2000):
+                if email_box.is_visible(timeout=3000):
                     email_box.fill(KLING_EMAIL)
+                    page.wait_for_timeout(300)
                 
                 pass_box = page.locator("input[type='password'], input[placeholder*='password' i], input[name*='password' i]").first
-                if pass_box.is_visible(timeout=2000):
+                if pass_box.is_visible(timeout=3000):
                     pass_box.fill(KLING_PASSWORD)
+                    page.wait_for_timeout(300)
                     
                 page.locator("button[type='submit'], button:has-text('Log In'), button:has-text('Sign In')").last.click(force=True)
                 page.wait_for_timeout(6000)
@@ -168,16 +169,18 @@ def otonom_kling_video_uret(video_prompt):
         # 2. 9:16 Dikey Formatı Seç
         try:
             oran_btn = page.locator("div:has-text('9:16'), button:has-text('9:16'), [data-value='9:16']").first
-            if oran_btn.is_visible(timeout=2000):
+            if oran_btn.is_visible(timeout=3000):
                 oran_btn.click(force=True)
-                print(" -> [9:16] formatı seçildi.")
+                print(" -> [9:16] dikey format seçildi.")
                 page.wait_for_timeout(500)
         except:
             pass
 
-        # 3. Prompt Alanını Doldur
-        print("[3/4] Prompt giriliyor...")
-        prompt_box = page.locator("textarea, div[contenteditable='true'], [placeholder*='describe' i], [placeholder*='Prompt' i]").first
+        # 3. Prompt Alanını Bul ve Doldur
+        print("[3/4] Prompt kutusu aranıyor ve yazılıyor...")
+        prompt_box = page.locator("textarea, div[contenteditable='true'], [placeholder*='describe' i], [placeholder*='Prompt' i], [class*='prompt-input']").first
+        prompt_box.wait_for(state="visible", timeout=35000)
+        
         prompt_box.click(force=True)
         page.wait_for_timeout(300)
         page.keyboard.press("Control+A")
@@ -234,7 +237,7 @@ def otonom_kling_video_uret(video_prompt):
         print(f" 10s Video Başarıyla Hazırlandı: {dosya_yolu}")
         return dosya_yolu
 
-# ================= YOUTUBE OTOMATİK YÜKLEME =================
+# ================= 3. YOUTUBE OTOMATİK YÜKLEME =================
 def youtube_yukle(dosya_yolu, meta_veri):
     print("\n[3/3] YouTube Shorts yüklemesi başlatılıyor...")
     if not os.path.exists("youtube_token.json"):
@@ -248,7 +251,7 @@ def youtube_yukle(dosya_yolu, meta_veri):
             "title": meta_veri["title"],
             "description": meta_veri["description"],
             "tags": meta_veri["tags"],
-            "categoryId": "26"  # Howto & Style
+            "categoryId": "26"
         },
         "status": {
             "privacyStatus": "public",
@@ -268,6 +271,7 @@ def youtube_yukle(dosya_yolu, meta_veri):
     video_id = response.get("id")
     print(f"\n BAŞARILI! YouTube Shorts yayında: https://youtube.com/shorts/{video_id}")
 
+# ================= ANA ÇALIŞTIRICI =================
 if __name__ == "__main__":
     try:
         icerik_paketi = icerik_uret()
