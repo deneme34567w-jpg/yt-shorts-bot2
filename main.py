@@ -34,7 +34,7 @@ def foto_cek(page, isim):
     except Exception as e:
         print(f" [FOTO UYARI] {isim}: {e}")
 
-# ================= 1. GEMINI 3.6 FLASH PROMPT MÜHENDİSİ =================
+# ================= 1. GEMINI PROMPT =================
 def icerik_uret():
     print("\n[1/3] Gemini 3.6 Flash günün menüsünü ve sinematik promptunu hazırlıyor...")
     bugun_tarih = datetime.now().strftime("%Y-%m-%d")
@@ -64,7 +64,7 @@ GÖREV:
     for deneme in range(3):
         try:
             response = client.models.generate_content(
-                model='gemini-3.6-flash',
+                model='gemini-2.5-flash',
                 contents=sistem_talimati
             )
             clean_json = response.text.replace("```json", "").replace("```", "").strip()
@@ -72,27 +72,65 @@ GÖREV:
             print(f" Menü: {veri.get('food_name')}")
             print(f" Başlık: {veri['title']}")
             return veri
-        except Exception as e:
-            print(f" [Gemini 3.6 Flash {deneme+1}. Deneme]: {e}")
-            time.sleep(3)
+        except:
+            time.sleep(2)
 
     yedekler = [
-        ("Miniature Wagyu Smash Burger", "Ultra realistic 8k macro video of miniature cooking in a tiny kitchen on a warm wooden countertop. A real human hand drops oil with a glass pipette onto a sizzling copper pan. A tiny spatula presses a miniature gourmet wagyu beef patty, melting cheddar cheese, served on a tiny toasted brioche bun. Golden hour lighting, crisp ASMR sounds, 8K ultra-realistic."),
-        ("Miniature Japanese Souffle Pancake", "Ultra realistic 8k macro video of miniature cooking in a tiny kitchen on a warm wooden countertop. Real human hand drops butter with pipette. Fluffy Japanese pancake batter sizzles in copper pan, flipped with tiny spatula onto a ceramic dish with maple syrup. Macro lens, golden hour light, 8K photorealistic."),
-        ("Miniature Crispy Churros", "Ultra realistic 8k macro video of miniature cooking in a tiny kitchen on a warm wooden countertop. Real hand drops oil into mini pan. Tiny churro dough fries to golden crisp perfection, dusted with cinnamon sugar, served with warm chocolate dip. Macro lens, ASMR sizzling, 8K ultra-realistic.")
+        ("Miniature Japanese Wagyu Steak", "Ultra realistic 8k macro video of miniature cooking in a tiny kitchen on a warm wooden countertop. A real human hand drops rosemary butter with a glass pipette onto a sizzling mini copper pan. A tiny spatula turns a miniature wagyu beef steak to golden perfection. Golden hour lighting, crisp ASMR sounds, 8K ultra-realistic."),
+        ("Miniature Souffle Pancake", "Ultra realistic 8k macro video of miniature cooking in a tiny kitchen on a warm wooden countertop. Real human hand drops oil with pipette. Fluffy pancake batter sizzles in mini copper pan, flipped with tiny spatula onto a ceramic dish with maple syrup. Macro lens, 8K photorealistic."),
+        ("Miniature Crispy Churros", "Ultra realistic 8k macro video of miniature cooking in a tiny kitchen on a warm wooden countertop. Real hand drops oil into mini pan. Tiny churro dough fries to golden crisp perfection, dusted with cinnamon sugar, served with chocolate dip. Macro lens, 8K ultra-realistic.")
     ]
     secilen = random.choice(yedekler)
     return {
         "food_name": secilen[0],
         "prompt": secilen[1],
-        "title": f"Satisfying Tiny {secilen[0]} Cooking ASMR 🥞✨ #Shorts",
+        "title": f"Satisfying Tiny {secilen[0]} Cooking ASMR 🥩✨ #Shorts",
         "description": f"Miniature kitchen ASMR cooking experience: {secilen[0]}. 8K ultra realistic. #MiniatureCooking #ASMR #Shorts #Satisfying",
         "tags": ["miniature cooking", "mini food", "asmr cooking", "satisfying", "shorts"]
     }
 
-# ================= 2. KLING GLOBAL VİDEO MOTORU =================
+# ================= 2. KLING VİTRİN GEÇİŞİ VE GİRİŞ =================
+def vitrin_gec_ve_giris_yap(page):
+    print(" Vitrin sayfası ve stüdyo geçişi kontrol ediliyor...")
+    page.wait_for_timeout(3000)
+
+    # 1. Ortadaki 'Create Now' veya 'Experience Now' Butonuna Bas
+    try:
+        create_now_btn = page.locator("button:has-text('Create Now'), a:has-text('Create Now'), button:has-text('Experience Now'), a:has-text('Experience Now'), a:has-text('Creative Studio')").first
+        if create_now_btn.is_visible(timeout=3000):
+            print(" -> 'Create Now' butonuna tıklandı, stüdyoya giriliyor...")
+            create_now_btn.click(force=True)
+            page.wait_for_timeout(5000)
+        elif page.locator("text='All-New KlingAI'").first.is_visible(timeout=1000):
+            page.mouse.click(960, 580)
+            page.wait_for_timeout(5000)
+    except Exception as e:
+        print(f"Vitrin geçişi uyarısı: {e}")
+
+    # 2. Oturum Kapalıysa E-posta / Şifre ile Giriş Yap
+    try:
+        sign_in_btn = page.locator("button:has-text('Sign In'), button:has-text('Log In'), button:has-text('Giriş'), [class*='signin'], [class*='login']").first
+        if sign_in_btn.is_visible(timeout=3000):
+            print(" -> Oturum açma formu dolduruluyor...")
+            sign_in_btn.click(force=True)
+            page.wait_for_timeout(2000)
+            
+            email_box = page.locator("input[type='email'], input[placeholder*='email' i], input[name*='email' i]").first
+            if email_box.is_visible(timeout=2000):
+                email_box.fill(KLING_EMAIL)
+            
+            pass_box = page.locator("input[type='password'], input[placeholder*='password' i], input[name*='password' i]").first
+            if pass_box.is_visible(timeout=2000):
+                pass_box.fill(KLING_PASSWORD)
+                
+            page.locator("button[type='submit'], button:has-text('Log In'), button:has-text('Sign In')").last.click(force=True)
+            page.wait_for_timeout(6000)
+    except Exception as e:
+        print(f"Giriş kontrolü: {e}")
+
+# ================= 3. KLING AI MOTORU =================
 def otonom_kling_video_uret(video_prompt):
-    print("\n[2/3] Kling Global (kling.ai) başlatılıyor...")
+    print("\n[2/3] Kling AI başlatılıyor...")
     dosya_yolu = os.path.abspath("shorts_video.mp4")
     yakalanan_video_bytes = []
 
@@ -130,32 +168,12 @@ def otonom_kling_video_uret(video_prompt):
 
         page.on("response", network_video_yakala)
 
-        print(" Kling AI Video Stüdyosu açılıyor...")
-        page.goto("https://kling.ai/text-to-video", wait_until="domcontentloaded", timeout=45000)
-        page.wait_for_timeout(6000)
+        print(" Kling AI açılıyor...")
+        page.goto("https://klingai.com", wait_until="domcontentloaded", timeout=45000)
+        page.wait_for_timeout(4000)
 
-        # 1. Oturum Kapalıysa E-posta / Şifre ile Giriş Yap
-        try:
-            sign_in_btn = page.locator("button:has-text('Sign In'), button:has-text('Log In'), button:has-text('Giriş'), [class*='signin'], [class*='login']").first
-            if sign_in_btn.is_visible(timeout=3000):
-                print(" -> Oturum açılıyor...")
-                sign_in_btn.click(force=True)
-                page.wait_for_timeout(2000)
-                
-                email_box = page.locator("input[type='email'], input[placeholder*='email' i], input[name*='email' i]").first
-                if email_box.is_visible(timeout=3000):
-                    email_box.fill(KLING_EMAIL)
-                    page.wait_for_timeout(300)
-                
-                pass_box = page.locator("input[type='password'], input[placeholder*='password' i], input[name*='password' i]").first
-                if pass_box.is_visible(timeout=3000):
-                    pass_box.fill(KLING_PASSWORD)
-                    page.wait_for_timeout(300)
-                    
-                page.locator("button[type='submit'], button:has-text('Log In'), button:has-text('Sign In')").last.click(force=True)
-                page.wait_for_timeout(6000)
-        except Exception as e:
-            print(f"Giriş kontrolü uyarısı: {e}")
+        # 1. Vitrin Sayfasını Geç ve Giriş Yap
+        vitrin_gec_ve_giris_yap(page)
 
         foto_cek(page, "01_studio_acildi.png")
 
@@ -166,7 +184,7 @@ def otonom_kling_video_uret(video_prompt):
             except:
                 pass
 
-        # 2. 9:16 Dikey Formatı Seç
+        # 2. 9:16 Formatını Seç
         try:
             oran_btn = page.locator("div:has-text('9:16'), button:has-text('9:16'), [data-value='9:16']").first
             if oran_btn.is_visible(timeout=3000):
@@ -176,7 +194,7 @@ def otonom_kling_video_uret(video_prompt):
         except:
             pass
 
-        # 3. Prompt Alanını Bul ve Doldur
+        # 3. Prompt Kutusunu Bul ve Yaz
         print("[3/4] Prompt kutusu aranıyor ve yazılıyor...")
         prompt_box = page.locator("textarea, div[contenteditable='true'], [placeholder*='describe' i], [placeholder*='Prompt' i], [class*='prompt-input']").first
         prompt_box.wait_for(state="visible", timeout=35000)
@@ -237,7 +255,7 @@ def otonom_kling_video_uret(video_prompt):
         print(f" 10s Video Başarıyla Hazırlandı: {dosya_yolu}")
         return dosya_yolu
 
-# ================= 3. YOUTUBE OTOMATİK YÜKLEME =================
+# ================= 4. YOUTUBE OTOMATİK YÜKLEME =================
 def youtube_yukle(dosya_yolu, meta_veri):
     print("\n[3/3] YouTube Shorts yüklemesi başlatılıyor...")
     if not os.path.exists("youtube_token.json"):
@@ -271,7 +289,6 @@ def youtube_yukle(dosya_yolu, meta_veri):
     video_id = response.get("id")
     print(f"\n BAŞARILI! YouTube Shorts yayında: https://youtube.com/shorts/{video_id}")
 
-# ================= ANA ÇALIŞTIRICI =================
 if __name__ == "__main__":
     try:
         icerik_paketi = icerik_uret()
