@@ -1,61 +1,36 @@
-name: Daily Autonomous YouTube Shorts
+name: HuggingFace Video Shorts Generator
 
 on:
-  schedule:
-    - cron: '0 15 * * *'  # Her gün Türkiye saatiyle 18:00'de otomatik çalışır
-  workflow_dispatch:
+  workflow_dispatch: # GitHub panelinden butona basarak çalıştırmak için
+  # schedule:
+  #   - cron: '0 10 * * *' # İleride her gün otomatik çalışması için
 
 jobs:
-  run-bot:
+  build-and-generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
 
     steps:
-      - name: Repoyu Çek
-        uses: actions/checkout@v3
+      - name: Kodları Depodan Çek
+        uses: actions/checkout@v4
 
       - name: Python Kur
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
-      # 1. Kütüphaneleri ve Chromium'u İndir
-      - name: Kütüphaneleri ve Tarayıcıyı Yükle
+      - name: Gerekli Paketleri Yükle
         run: |
-          pip install -r requirements.txt
-          python -m playwright install chromium --with-deps
+          pip install gradio_client
 
-      # 2. Cloudflare WARP Başlat
-      - name: Cloudflare WARP Başlat
-        run: |
-          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-warp.list
-          sudo apt-get update && sudo apt-get install -y cloudflare-warp
-          warp-cli --accept-tos registration new || true
-          warp-cli --accept-tos mode warp || true
-          warp-cli --accept-tos connect || true
-          sleep 3
-
-      # 3. Asıl Botu Çalıştır ve YouTube'a Yükle
-      - name: Botu Çalıştır ve YouTube'a Yükle
+      - name: Videoyu Üret (Hugging Face GPU)
         env:
-          KLING_EMAIL: ${{ secrets.KLING_EMAIL }}
-          KLING_PASSWORD: ${{ secrets.KLING_PASSWORD }}
-          YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python main.py
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python main.py
 
-      # 4. VPN'i Kapat
-      - name: VPN'i Kapat
-        if: always()
-        run: warp-cli --accept-tos disconnect || true
-
-      # 5. Ekran Görüntülerini Yükle
-      - name: Ekran Görüntülerini Yükle
+      - name: Üretilen Videoyu İndirilebilir Yap (Artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ekran-goruntuleri-raporu
-          path: |
-            ekran_goruntuleri/
-            *.png
+          name: olusturulan-shorts-videosu
+          path: downloads/mini_cooking_asmr.mp4
