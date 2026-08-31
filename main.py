@@ -15,15 +15,18 @@ PROMPT = (
 def generate_video_huggingface():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    # GitHub Secret'tan gelen HF_TOKEN'ı oku
+    # GitHub Secrets üzerinden gelen token
     hf_token = os.getenv("HF_TOKEN", None)
     
     print("\n" + "="*50)
     print("[*] GITHUB ACTIONS: HUGGING FACE BULUT GPU MOTORU BAŞLATILDI")
     print("="*50)
     
-    # LTX-Video modeline bağlanıyoruz
-    client = Client("Lightricks/LTX-Video", hf_token=hf_token)
+    # gradio_client'ta parametre adı 'token'dır veya HF_TOKEN env varsa otomatik algılar
+    if hf_token:
+        client = Client("Lightricks/LTX-Video", token=hf_token)
+    else:
+        client = Client("Lightricks/LTX-Video")
     
     print(f"\n[*] Prompt: {PROMPT[:70]}...")
     print("[*] Video bulut GPU'sunda render ediliyor, lütfen bekleyin...")
