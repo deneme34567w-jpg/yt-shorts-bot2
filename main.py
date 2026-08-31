@@ -22,15 +22,20 @@ def generate_video_huggingface():
     print("[*] GITHUB ACTIONS: HUGGING FACE BULUT GPU MOTORU BAŞLATILDI")
     print("="*50)
     
+    # Doğru Space Adresi: Lightricks/ltx-video-distilled
+    space_name = "Lightricks/ltx-video-distilled"
+    print(f"[*] Canlı Space sunucusuna bağlanılıyor: {space_name}")
+    
     if hf_token:
-        client = Client("Lightricks/LTX-Video", token=hf_token)
+        client = Client(space_name, token=hf_token)
     else:
-        client = Client("Lightricks/LTX-Video")
+        client = Client(space_name)
     
     print(f"\n[*] Prompt: {PROMPT[:70]}...")
-    print("[*] Video bulut GPU'sunda render ediliyor, lütfen bekleyin...")
+    print("[*] Video bulut GPU'sunda render ediliyor, lütfen bekleyin (1-2 dk)...")
 
     try:
+        # Modeli çalıştırıyoruz
         result = client.predict(
             prompt=PROMPT,
             negative_prompt="blurry, low quality, distorted, deformed, watermark, text",
@@ -38,7 +43,7 @@ def generate_video_huggingface():
             height=1024,
             num_frames=121,
             guidance_scale=3.0,
-            api_name="/generate_video"
+            seed=-1
         )
 
         print(f"\n[✓] Render tamamlandı! Dosya konumu: {result}")
